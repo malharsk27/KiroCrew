@@ -289,7 +289,11 @@ def worker_additions(base: dict[str, Any], mate_spec: dict[str, Any]) -> dict[st
     raw_prompt = mate_spec.get("prompt")
     prompt = raw_prompt.strip() if isinstance(raw_prompt, str) else ""
     own = (base_prompt or "").strip()
-    if own and prompt.startswith(own):
+    if own and prompt and own.startswith(prompt):
+        # The base opens with this whole prompt (the worker base is the default
+        # template's prompt plus the worker's own principles), so it adds nothing.
+        prompt = ""
+    elif own and prompt.startswith(own):
         # A template built on the default one opens with the base's own text;
         # only what follows it is an addition, or the worker would read it twice.
         prompt = prompt[len(own) :].strip()
