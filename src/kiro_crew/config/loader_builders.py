@@ -869,14 +869,46 @@ def _build_session_config(session_data: dict) -> SessionConfig:
     )
 
 
+# The whole ``telemetry`` section exactly as a whole-document ``save()`` wrote it
+# before recording was on by default: every field at its old default. Older
+# builds wrote this on first boot, so nearly every upgraded install carries it
+# without anyone having chosen any of it.
+_PRE_DEFAULT_ON_SAVED_TELEMETRY = {
+    "enabled": False,
+    "local_dir": "",
+    "export_interval_seconds": 60,
+    "retention_days": 0,
+    "max_total_mb": 0,
+    "otlp_endpoint": "",
+    "beacon_enabled": True,
+    "beacon_endpoint": _sections._DEFAULT_BEACON_ENDPOINT,
+}
+
+
 def _build_telemetry_config(telemetry_data: dict) -> TelemetryConfig:
     section = _sections.SectionReader(TelemetryConfig, telemetry_data)
+    enabled = bool(section.get("enabled"))
+    # An install that turned the heartbeat off and never set ``enabled`` has
+    # already said no to telemetry, so recording follows it instead of the
+    # field default. A rule at load time: no config file is rewritten.
+    if "enabled" not in telemetry_data and telemetry_data.get("beacon_enabled") is False:
+        enabled = False
+    retention_days = section.read("retention_days", _safe_int)
+    max_total_mb = section.read("max_total_mb", _safe_int)
+    # An untouched old save carries ``0 / 0`` for the disk caps, which nobody
+    # chose. Read it as the current caps, so turning recording on later on such a
+    # host cannot grow the metrics folder without bound. ``enabled: false`` in the
+    # same section is left as written: it may be the user's off, and off is the
+    # safe reading of an ambiguous privacy setting.
+    if dict(telemetry_data) == _PRE_DEFAULT_ON_SAVED_TELEMETRY:
+        retention_days = section.default("retention_days")
+        max_total_mb = section.default("max_total_mb")
     return TelemetryConfig(
-        enabled=bool(section.get("enabled")),
+        enabled=enabled,
         local_dir=str(section.get("local_dir")),
         export_interval_seconds=section.read("export_interval_seconds", _safe_int),
-        retention_days=section.read("retention_days", _safe_int),
-        max_total_mb=section.read("max_total_mb", _safe_int),
+        retention_days=retention_days,
+        max_total_mb=max_total_mb,
         otlp_endpoint=str(section.get("otlp_endpoint")),
         beacon_enabled=bool(section.get("beacon_enabled")),
         beacon_endpoint=str(section.get("beacon_endpoint")),

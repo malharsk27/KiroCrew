@@ -24,11 +24,16 @@ const SHELL_LABEL_KEY = {
 } as const
 
 /** The three per-shell env-var forms, keyed by the same shell ids as
- * `SHELL_LABEL_KEY` so a new shell cannot be added without its label. */
+ * `SHELL_LABEL_KEY` so a new shell cannot be added without its label.
+ *
+ * `DO_NOT_TRACK`, not `KIROCREW_TELEMETRY_DISABLED`: with local recording on by
+ * default, the env var shown here must turn off everything the command above it
+ * does. `KIROCREW_TELEMETRY_DISABLED` stops only the heartbeat, so a user who
+ * copied it would believe metrics were off while recording went on. */
 export const SHELL_COMMANDS = [
-  { shell: 'macos', command: 'export KIROCREW_TELEMETRY_DISABLED=1' },
-  { shell: 'powershell', command: "$env:KIROCREW_TELEMETRY_DISABLED = '1'" },
-  { shell: 'cmd', command: 'set KIROCREW_TELEMETRY_DISABLED=1' },
+  { shell: 'macos', command: 'export DO_NOT_TRACK=1' },
+  { shell: 'powershell', command: "$env:DO_NOT_TRACK = '1'" },
+  { shell: 'cmd', command: 'set DO_NOT_TRACK=1' },
 ] as const satisfies ReadonlyArray<{
   shell: keyof typeof SHELL_LABEL_KEY
   command: string

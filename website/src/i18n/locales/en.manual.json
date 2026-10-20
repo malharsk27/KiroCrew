@@ -9089,7 +9089,7 @@
     "controlsTitle": "Telemetry controls",
     "dataNeverSentBody": "Prompts, responses, files, credentials, hostnames, usernames, or your operating system. Your IP is not stored.",
     "dataNeverSentTitle": "Never sent",
-    "localDataBody": "Usage and context records. Performance metrics are off by default.",
+    "localDataBody": "Performance metrics are recorded on this device by default. The Record metrics switch in Settings > Privacy shows whether they are on now.",
     "localDataTitle": "Stays on your device",
     "notSendingAlreadySentToday": "Today's heartbeat has already been sent.",
     "notSendingAwaitingAck": "Nothing has been sent yet. The first heartbeat waits until you've seen this page.",

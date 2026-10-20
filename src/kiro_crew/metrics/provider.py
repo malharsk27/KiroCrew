@@ -1,14 +1,17 @@
 """Telemetry provider wiring — builds the process-global ``MetricsRecorder``.
 
 Consent + local-first:
-  * ``telemetry.enabled`` defaults **False**. When off, ``get_recorder()`` returns
-    a no-op recorder, so adding metric call sites is a zero-runtime-effect change
-    until a host opts in (mirrors the ``mcp_gateway.enabled`` /
-    ``skills.lazy_load`` default-off convention).
-  * Easy opt-in: set ``telemetry.enabled: true`` in ``~/.kiro/crew/config.json``
-    OR export the ``KIROCREW_TELEMETRY`` env var (``1``/``true``/``on`` to enable,
-    ``0``/``false``/``off`` to force-disable). The env var overrides the config
-    flag and gates LOCAL collection only — it never enables network egress.
+  * ``telemetry.enabled`` defaults **True**: local recording is on unless the
+    user turned it off, and every user is told (the dashboard's Privacy chapter,
+    or a one-line notice on a CLI or headless start, see :mod:`metrics.notice`).
+    When off, ``get_recorder()`` returns a no-op recorder.
+  * Off switches: ``telemetry.enabled: false`` in ``~/.kiro/crew/config.json``
+    (what the Privacy chapter's Turn off and ``kirocrew telemetry disable``
+    write), the ``KIROCREW_TELEMETRY`` env var (``0``/``false``/``off``
+    force-disables, ``1``/``true``/``on`` force-enables), or a truthy
+    ``DO_NOT_TRACK``, which wins over everything. The env vars gate LOCAL
+    collection only; network egress needs a destination AND
+    :func:`outbound_consented`.
   * Opting in does NOT require a restart. The recorder is process-global and
     memoized, but ``get_recorder()`` re-resolves consent on a rate-limited window
     (``_CONSENT_RECHECK_SECS``) and rebuilds when it moved — so a config edit from
@@ -463,7 +466,7 @@ _check_in_flight = False
 # LOCAL metrics on (or force them off) without editing ~/.kiro/crew/config.json —
 # handy for CI, containers, and one-off debugging. Truthy => enable, falsy =>
 # disable, unset/blank => defer to the ``telemetry.enabled`` config flag (itself
-# default False). This gates LOCAL collection ONLY: external OTLP egress needs the
+# default True). This gates LOCAL collection ONLY: external OTLP egress needs the
 # active telemetry provider to name a destination (the default provider does so
 # only for a non-empty ``telemetry.otlp_endpoint``), so merely flipping this var
 # never causes data to leave the host (egress stays off by default).
@@ -493,12 +496,74 @@ def env_pin() -> Optional[bool]:
         return True
     if raw in _ENV_FALSY:
         return False
+    if _heartbeat_env_opt_out_holds_recording_off():
+        return False
     return None
+
+
+def _heartbeat_env_opt_out_holds_recording_off() -> bool:
+    """``KIROCREW_TELEMETRY_DISABLED`` also keeps the DEFAULT recording off.
+
+    That variable was the env-var opt-out the dashboard showed before recording
+    was on by default, so a host that set it has already said no to telemetry.
+    It holds recording off only while nobody wrote ``telemetry.enabled``: a
+    written choice (Settings, ``kirocrew telemetry enable``) still decides. The
+    files are read only when the variable is set, so other hosts pay nothing.
+    """
+    if not beacon._env_truthy(beacon.DISABLE_ENV):
+        return False
+    try:
+        from kiro_crew.config.loader import written_value
+
+        return written_value("telemetry", "enabled") is None
+    except Exception:
+        # Unreadable: fail toward off, which is what the variable asked for.
+        return True
 
 
 def pin_env_var() -> str:
     """Name the env var behind :func:`env_pin`, for a UI note that says which to unset."""
-    return beacon.DO_NOT_TRACK_ENV if beacon.do_not_track() else TELEMETRY_ENV_VAR
+    if beacon.do_not_track():
+        return beacon.DO_NOT_TRACK_ENV
+    raw = os.environ.get(TELEMETRY_ENV_VAR, "").strip().lower()
+    if raw not in _ENV_TRUTHY and raw not in _ENV_FALSY and _heartbeat_env_opt_out_holds_recording_off():
+        return beacon.DISABLE_ENV
+    return TELEMETRY_ENV_VAR
+
+
+def outbound_consented(cfg: KiroCrewConfig) -> bool:
+    """Whether metrics may leave this machine at all, given that recording is on.
+
+    Recording is local. Sending it anywhere needs an explicit opt-in to recording
+    that the user made themselves: ``KIROCREW_TELEMETRY`` truthy, or
+    ``telemetry.enabled: true`` written in a config file. A recording default
+    alone never permits export, so a host with an export destination configured
+    cannot start exporting just because the default changed.
+
+    The Privacy chapter's acknowledgement (``dashboard.privacy_ack_version``) is
+    deliberately NOT enough: today's notice text says recorded data stays on this
+    machine, so agreeing to it is not agreeing to export. A notice that names the
+    export destination would have to bump the version before it could count.
+
+    Fails closed: anything unreadable answers False.
+    """
+    try:
+        if env_pin() is True:
+            return True
+        if not cfg.telemetry.enabled:
+            return False
+        from kiro_crew.config.fields import field_default
+        from kiro_crew.config.loader import TelemetryConfig as _TelemetryConfig
+        from kiro_crew.config.loader import written_value
+
+        # A true value that is not the field's default can only be one somebody
+        # chose; past that, ask the files whether ``true`` was written.
+        if field_default(_TelemetryConfig, "enabled") is not True:
+            return True
+        return written_value("telemetry", "enabled") is True
+    except Exception:
+        logger.debug("outbound consent unresolvable; export disabled", exc_info=True)
+        return False
 
 
 def _consent_enabled(cfg: object) -> bool:
@@ -656,7 +721,8 @@ def _build_recorder() -> _Build:
     # it unset there would make every recheck window see a difference and rebuild
     # a no-op recorder in a loop.
     try:
-        cfg = KiroCrewConfig.load().telemetry
+        full_cfg = KiroCrewConfig.load()
+        cfg = full_cfg.telemetry
     except Exception as exc:
         logger.warning("telemetry config load failed; metrics disabled: %s", exc)
         # Unknown rather than False: the next successful read re-resolves once.
@@ -683,6 +749,15 @@ def _build_recorder() -> _Build:
     # not be folded into "telemetry init failed" below, and resolving first means
     # there is nothing started to reap if it goes wrong.
     destinations = _otlp_destinations(cfg)
+    # Recording on is not consent to export. Checked only when a destination
+    # exists, so the common local-only host reads nothing extra.
+    if destinations and not outbound_consented(full_cfg):
+        logger.info(
+            "telemetry export waits for an explicit opt-in to recording "
+            "(telemetry.enabled: true in config.json, or KIROCREW_TELEMETRY=1); "
+            "local only"
+        )
+        destinations = ()
 
     # PeriodicExportingMetricReader starts its daemon ticker thread inside
     # __init__, so if any later step (MeterProvider construction, etc.) raises,

@@ -19332,7 +19332,7 @@
     "installReceiptBody": "Tras una instalación o actualización correcta desde el catálogo oficial de Kiro Crew, se envía un recibo anónimo. Nunca se informan registros externos, apps locales ni apps autorregistradas.",
     "installReceiptFields": "slug de la app oficial · token anónimo por app (no vinculable entre apps) · instalación nueva/actualización · versión de Kiro Crew",
     "installReceiptTitle": "Recibos de instalación de apps oficiales",
-    "localDataBody": "Registros de uso y contexto. Las métricas de rendimiento están desactivadas por defecto.",
+    "localDataBody": "Las métricas de rendimiento se registran en este dispositivo de forma predeterminada. El interruptor «Registrar métricas» en Configuración > Privacidad muestra si están activadas ahora.",
     "localDataTitle": "Se queda en tu dispositivo",
     "notSendingAlreadySentToday": "La señal de hoy ya se envió.",
     "notSendingAwaitingAck": "Todavía no se ha enviado nada. La primera señal espera hasta que hayas visto esta página.",
