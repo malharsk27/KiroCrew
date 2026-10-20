@@ -1133,8 +1133,11 @@ class TestTheRealAppendPath:
         self._wake(SESSION, "turn/started", int(started.seq))
         # The session was opened AFTER export install (its opened_ts is a fresh now_ms),
         # so its first sight counts session.started once; the next delivery (the turn)
-        # diffs against the baselined floor and counts the turn.
-        assert recorded == [
+        # diffs against the baselined floor and counts the turn. The eager fold worker
+        # also records its own crew log fold counters through the same recorder, so
+        # only this module's two metrics are compared.
+        mine = {export.SESSION_STARTED_METRIC, export.TURN_STARTED_METRIC}
+        assert [r for r in recorded if r[0] in mine] == [
             (export.SESSION_STARTED_METRIC, 1, {"agent_kind": "worker"}),
             (export.TURN_STARTED_METRIC, 1, {"actor": "user", "agent_kind": "worker"}),
         ]
