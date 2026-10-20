@@ -1741,7 +1741,6 @@ jobs:
             case "$token" in
               pass)        conclusion="success" ;;
               nothing-new) conclusion="neutral" ;;
-              concerns)    conclusion="neutral" ;;
               block)       conclusion="failure" ;;
               *)           conclusion="failure"; title="${title:-review incomplete — not a pass}"; settled="no" ;;
             esac
@@ -1847,7 +1846,7 @@ jobs:
           fi
           case "$CONCLUSION" in
             success) badge="✅ PASS" ;;
-            neutral) badge="🟡 CONCERNS" ;;
+            neutral) badge="✅ nothing new to adjudicate" ;;
             *)       badge="🔴 BLOCK (blocking)" ;;
           esac
           {
@@ -2635,7 +2634,7 @@ jobs:
           && steps.post.outputs.retained_verdict_artifact != ''
           && needs.validate.outputs.scrub_ok == 'true'
         # NEVER fatal. A lane's conclusion is read by pr-readiness.yml, and for
-        # the three advisory labels ANY non-success conclusion is reported as
+        # the three whole-design labels ANY non-success conclusion is reported as
         # `<label> (BLOCK)` -- a judged-wrong verdict. So a transport flake here,
         # or an `if-no-files-found: error` on a directory that did not survive,
         # would invent a verdict nobody reached. Retention is evidence ABOUT a

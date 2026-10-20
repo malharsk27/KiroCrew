@@ -1799,7 +1799,6 @@ jobs:
             case "$token" in
               pass)        verdict="PASS" ;;
               nothing-new) verdict="NOTHING-NEW" ;;
-              concerns)    verdict="CONCERNS" ;;
               block)       verdict="BLOCK" ;;
               *)           verdict="UNKNOWN" ;;
             esac
@@ -1811,7 +1810,6 @@ jobs:
             case "$verdict" in
               PASS)        badge="✅ PASS" ;;
               NOTHING-NEW) badge="✅ nothing new to adjudicate" ;;
-              CONCERNS)    badge="🟡 CONCERNS" ;;
               BLOCK)       badge="🔴 BLOCK (blocking)" ;;
               *)           badge="" ;;
             esac
@@ -2623,7 +2621,7 @@ jobs:
           && needs.validate.outputs.scrub_ok == 'true'
           )
         # NEVER fatal. A lane's conclusion is read by pr-readiness.yml, and for
-        # the three advisory labels ANY non-success conclusion is reported as
+        # the three whole-design labels ANY non-success conclusion is reported as
         # `<label> (BLOCK)` -- a judged-wrong verdict. So a transport flake here,
         # or an `if-no-files-found: error` on a directory that did not survive,
         # would invent a verdict nobody reached. Retention is evidence ABOUT a
@@ -2692,12 +2690,6 @@ jobs:
           case "$VERDICT" in
             PASS|NOTHING-NEW)
               echo "Security scope verdict for $HEAD: $VERDICT ($WHY)."
-              exit 0 ;;
-            CONCERNS)
-              # Advisory, and deliberately not silent: a green tick tells a
-              # reader nothing was worth reading. A job cannot report itself
-              # `neutral`, so the basis goes on the job as an annotation.
-              echo "::warning title=Security Scope Review CONCERNS::$WHY -- read the Security Scope Review comment on this PR."
               exit 0 ;;
             BLOCK)
               echo "::error::Security scope verdict for $HEAD: BLOCK -- $WHY. Narrow the rule at the tier named in the PR comment. Withdrawing a golden path is not the way to green: that is its own pull request, on its own merits."
