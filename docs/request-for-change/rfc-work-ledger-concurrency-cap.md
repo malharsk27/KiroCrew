@@ -87,10 +87,15 @@ Two numbers on the goal's board header, each doing one job:
 
 The conductor prompt and the goal-conductor skill say: a concurrency refusal is
 about parallel work; wait for an item to land, or ask the user to raise
-`concurrency_cap`. The total is a line in every round report
-(`items used: N of <item_cap>`), and when `cap_exceeded` is true the conductor says
-so in that report and carries on. The no-progress check (two rounds, nothing
-accepted) is unchanged.
+`concurrency_cap`. The total is the conductor's to manage: it stays out of round
+reports, and the first report after `cap_exceeded` turns true tells the user once
+that the goal has spent past its line, then carries on. The no-progress check (two
+rounds, nothing accepted) is unchanged.
+
+> **Amended 2026-10-20 (#22415).** This section first put `items used: N of
+> <item_cap>` in every round report. Users read that running meter as a quota they
+> had to manage, so the count now reaches the user only when `cap_exceeded` turns
+> true. `goal_items_used`, `item_cap` and `cap_exceeded` are unchanged.
 
 ## 4. Not decided here
 

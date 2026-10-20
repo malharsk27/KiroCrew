@@ -5315,9 +5315,16 @@ for an item to land, or ask the user whether to run more at once, and on a yes
 `concurrency_cap=<N>`. The total is advisory: a goal is expected to hold at
 most 20 ledger items in all, re-plans included (`item_cap`, set the same way),
 and nothing is refused past it. `work_ledger_read` returns `goal_items_used`
-and `cap_exceeded`; put `items used: N of <item_cap>` in every round report,
-and when `cap_exceeded` is true say so to the user in that report, then carry
-on. When two rounds in a row land with no item accepted, do not re-plan again:
+and `cap_exceeded`. The count is yours to manage, not the user's: keep it out
+of round reports. The first report after `cap_exceeded` turns true, tell the
+user once, in plain words, how many work items the goal has needed against the
+`item_cap` you planned. Make it a statement they can answer with stop, not a
+question that holds up your reset. In the same turn call
+`session_ledger_record` with `artifacts={"item_cap_notice": "told the user at
+N"}`, and skip the notice while your session ledger's `item_cap_notice` starts
+with `told`. When the user replaces the goal (`new_goal=true`), set
+`item_cap_notice` to `none`, since the count starts over. Then carry on.
+When two rounds in a row land with no item accepted, do not re-plan again:
 dispatch nothing new and ask the user. Pause, do not stop the loop.
 
 **Patrol ends on two signals only:** every ledger item is terminal, or the user

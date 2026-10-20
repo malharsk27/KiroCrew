@@ -555,7 +555,8 @@ class TestConductorInstaller:
     def test_back_to_back_rounds_keep_a_spend_bound(self, tmp_path, monkeypatch):
         """Without a pause between rounds, a default concurrency cap and a no-progress
         back-off are the only hard spend gates when the user set no bound; the item
-        total is a line the conductor reports, not a refusal it asks about.
+        total is the conductor's to manage, said to the user once when it is passed,
+        never a running meter in every report.
         """
         prompt = " ".join(self._install(tmp_path, monkeypatch)["prompt"].split())
         body = " ".join((SKILL_DIR / "SKILL.md").read_text(encoding="utf-8").split())
@@ -564,8 +565,17 @@ class TestConductorInstaller:
             assert "two rounds in a row" in text
             assert "goal_concurrency_cap_reached" in text
             assert "concurrency_cap=<N>" in text
-            assert "items used: N of <item_cap>" in text
             assert "cap_exceeded" in text
+            # The count stays out of routine reports and surfaces once, at the cap.
+            assert "keep it out of round reports" in text
+            assert "first report after `cap_exceeded` turns true" in text
+            # "Once" survives the per-round reset only through a persisted marker,
+            # and a statement (not a question) never holds that reset up.
+            assert '`artifacts={"item_cap_notice": "told the user at N"}`' in text
+            assert "`new_goal=true`), set `item_cap_notice` to `none`" in text
+            assert "keep going?" not in text.lower()
+            assert "items used: N of" not in text
+            assert "in every round report" not in text
             # The old refusal is gone from both, so neither tells the conductor to
             # stop and ask when the total is passed.
             assert "goal_item_cap_reached" not in text
